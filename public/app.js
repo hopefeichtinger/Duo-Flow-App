@@ -4,9 +4,31 @@
   const nav = document.getElementById('nav');
   let token = '';
   try { token = localStorage.getItem('df_token') || ''; } catch (e) {}
-  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false, studios: [], studio: null, editStudios: false };
+  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false, studios: [], studio: null, editStudios: false, loc: null, locMsg: '' };
   const DOTS = { corepower: '#f47c16', solid: '#2f55d4', barre: '#e02020' };
   const studioName = id => (S.studios.find(x => x.id === id) || {}).name || id;
+
+  // Location stays on this phone. It is never sent to the server; it only picks which location to show first.
+  const miles = (a, b) => { const r = x => x * Math.PI / 180, dl = r(b[0] - a[0]), dn = r(b[1] - a[1]); const q = Math.sin(dl / 2) ** 2 + Math.cos(r(a[0])) * Math.cos(r(b[0])) * Math.sin(dn / 2) ** 2; return 3959 * 2 * Math.asin(Math.sqrt(q)); };
+  function nearest() {
+    const st = S.studios.find(x => x.id === S.studio);
+    if (!S.loc || !st) return null;
+    let best = null;
+    for (const l of st.locations) { const d = miles(S.loc, st.coords[l]); if (!best || d < best.d) best = { name: l, d }; }
+    return best;
+  }
+  function shareLoc(quiet) {
+    if (!navigator.geolocation) { if (!quiet) { S.locMsg = 'This browser can’t share location.'; render(); } return; }
+    if (!quiet) { S.locMsg = 'Asking for your location…'; render(); }
+    navigator.geolocation.getCurrentPosition(p => {
+      S.loc = [p.coords.latitude, p.coords.longitude]; S.locMsg = '';
+      try { localStorage.setItem('df_loc', '1'); } catch (e) {}
+      if (!quiet) toast('Location on. Showing your nearest location first.');
+      render();
+    }, () => { S.locMsg = quiet ? '' : 'Location is off for this page. Allow it in your browser or phone settings and try again.'; if (!quiet) render(); }, { timeout: 10000, maximumAge: 600000 });
+  }
+  function locOff() { S.loc = null; S.locMsg = ''; try { localStorage.removeItem('df_loc'); } catch (e) {} render(); }
+  try { if (localStorage.getItem('df_loc') === '1') shareLoc(true); } catch (e) {}
 
   // The app mark: a ring of friends around one center, the same picture as the Home Screen icon.
   function ringMark() {
@@ -113,7 +135,7 @@
   const TABS = [['home', 'Home'], ['friends', 'Friends'], ['me', 'Me'], ['privacy', 'Privacy']];
 
   function signOut() {
-    token = ''; S.user = null; S.studio = null; S.editStudios = false; S.notes = { items: [], unread: 0 };
+    token = ''; S.user = null; S.studio = null; S.editStudios = false; S.loc = null; S.locMsg = ''; S.notes = { items: [], unread: 0 };
     try { localStorage.removeItem('df_token'); } catch (e) {}
     render();
   }
@@ -292,8 +314,9 @@
     if (c.booked) label = 'Cancel';
     else if (c.spotsLeft <= 0) label = 'Full';
     else label = c.going.length ? 'Book with ' + c.going[0].name + (c.going.length > 1 ? ' +' + (c.going.length - 1) : '') : 'Book';
+    const nr = nearest();
     return el('div', { class: 'card cls' },
-      el('b', {}, c.type),
+      el('div', { class: 'row' }, el('b', { class: 'grow' }, c.type), nr && nr.name === c.location ? el('span', { class: 'pill' }, 'Nearest') : null),
       el('span', { class: 'mute' }, c.location + ' · ' + c.spotsLeft + ' spots left'),
       c.going.length ? el('div', { class: 'row', style: 'margin-top:10px' },
         el('div', { class: 'avs' }, c.going.map(av)), el('span', { class: 'mute' }, names(c.going) + (c.going.length > 1 ? ' are going' : ' is going'))) : null,
@@ -316,6 +339,8 @@
           Array.from({ length: 7 }, (_, i) => addDays(S.today, i)).map(d =>
             el('button', { class: 'day' + (d === S.day ? ' on' : ''), role: 'tab', 'aria-selected': String(d === S.day), onclick: guard(async () => { S.day = d; await load(); }) },
               el('span', {}, wk(d)), el('b', {}, Number(d.slice(8)))))),
+        nearest() ? el('p', { class: 'mute' }, 'Nearest to you: ', el('b', {}, nearest().name), ' · ' + (nearest().d < 10 ? nearest().d.toFixed(1) : Math.round(nearest().d)) + ' mi')
+          : el('p', { class: 'mute' }, el('button', { class: 'link', type: 'button', onclick: () => shareLoc(false) }, 'Show my nearest location')),
         el('p', { class: 'mute' }, studioName(S.studio) + ' · ' + wk(S.day, true) + ', ' + md(S.day) + '. Friends who share their schedule show up on each class.'),
         classes.length ? list : el('div', { class: 'card mute' }, 'No classes on this day.'));
     };
@@ -377,6 +402,9 @@
       el('div', { class: 'card row' },
         el('div', { class: 'grow' }, el('b', {}, 'My studios'), el('br'), el('span', { class: 'mute' }, (S.user.studios || []).map(studioName).join(' · '))),
         el('button', { class: 'btn alt', onclick: () => { S.editStudios = true; render(); } }, 'Edit')),
+      el('div', { class: 'card row' },
+        el('div', { class: 'grow' }, el('b', {}, 'Nearest location'), el('p', { class: 'mute' }, S.loc ? 'On. Your location stays on this phone and is never shared with friends.' : 'Show the studio location closest to you first. Your location stays on this phone.'), S.locMsg ? el('p', { class: 'mute', role: 'status' }, S.locMsg) : null),
+        S.loc ? el('button', { class: 'btn alt', onclick: locOff }, 'Turn off') : el('button', { class: 'btn', onclick: () => shareLoc(false) }, 'Turn on')),
       el('h2', {}, 'My schedule'),
       el('p', { class: 'mute' }, classes.length ? classes.length + (classes.length > 1 ? ' upcoming classes' : ' upcoming class') : ''),
       classes.length ? classes.map(c => el('div', { class: 'card cls' },

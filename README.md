@@ -96,3 +96,4 @@ Notifications respect privacy every time the list loads, not just when the event
 - Sign-in, sign-up and the studio picker use the pink theme from the Home Screen icon.
 - The class schedules for Solid Core and Pure Barre are sample data like CorePower's. Replace `STUDIOS` in server.js with real schedules when you have a feed.
 - Accounts that existed before 0.4 see the studio picker once at their next sign-in.
+- Nearest location (optional): members can turn it on from Home or Me. The browser asks for permission, the position stays on the phone and is never sent to the server, and it only decides which location is shown first.

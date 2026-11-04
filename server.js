@@ -147,6 +147,10 @@ const STUDIOS = {
   barre: { name: 'Pure Barre', types: ['Barre Classic', 'Barre Sculpt', 'Barre Burn', 'Barre Stretch'], locs: ['Hyde Park', 'Bucktown', 'Andersonville'], times: ['07:00', '09:30', '17:30'] }
 };
 const STUDIO_IDS = Object.keys(STUDIOS);
+// Approximate neighborhood centers, used only to show a member their nearest location.
+const COORDS = { 'Lakeview': [41.940, -87.650], 'Lincoln Park': [41.924, -87.650], 'Old Town': [41.910, -87.637],
+  'West Loop': [41.882, -87.648], 'Gold Coast': [41.905, -87.628], 'River North': [41.892, -87.634],
+  'Hyde Park': [41.794, -87.590], 'Bucktown': [41.917, -87.680], 'Andersonville': [41.980, -87.668] };
 const LOCS = STUDIO_IDS.flatMap(id => STUDIOS[id].locs);
 const studioOfLocation = loc => { const l = String(loc || '').toLowerCase(); return STUDIO_IDS.find(id => STUDIOS[id].locs.some(x => l.includes(x.toLowerCase()))) || null; };
 const parseStudios = v => (v ? String(v).split(',').filter(x => STUDIO_IDS.includes(x)) : null);
@@ -395,7 +399,7 @@ async function api(req, res, url) {
   if (route === 'GET /api/me') {
     const u = db.prepare('SELECT id,name,email,hide_all,verified,studios FROM users WHERE id=?').get(uid);
     u.studios = parseStudios(u.studios);
-    const catalog = STUDIO_IDS.map(id => ({ id, name: STUDIOS[id].name, locations: STUDIOS[id].locs }));
+    const catalog = STUDIO_IDS.map(id => ({ id, name: STUDIOS[id].name, locations: STUDIOS[id].locs, coords: Object.fromEntries(STUDIOS[id].locs.map(l => [l, COORDS[l]])) }));
     return send(res, 200, { user: u, today: todayStr(), requireVerify: REQUIRE_VERIFY, studios: catalog });
   }
   if (route === 'POST /api/studios') {
