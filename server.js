@@ -50,6 +50,10 @@ CREATE INDEX IF NOT EXISTS notif_user ON notifications(user, read);
   const cols = db.prepare('PRAGMA table_info(users)').all().map(c => c.name);
   if (!cols.includes('verified')) db.exec('ALTER TABLE users ADD COLUMN verified INTEGER NOT NULL DEFAULT 1');
   if (!cols.includes('tv')) db.exec('ALTER TABLE users ADD COLUMN tv INTEGER NOT NULL DEFAULT 0');
+  // Version 0.4: which studios a member belongs to (comma list). NULL means they haven't chosen yet.
+  if (!cols.includes('studios')) db.exec('ALTER TABLE users ADD COLUMN studios TEXT');
+  if (!db.prepare('PRAGMA table_info(classes)').all().some(c => c.name === 'studio'))
+    db.exec("ALTER TABLE classes ADD COLUMN studio TEXT NOT NULL DEFAULT 'corepower'");
 }
 // Studio schedule rows have created_by NULL; member-added classes belong to the member who added them.
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS classes_uniq ON classes(location, start, COALESCE(created_by, 0))');
@@ -136,19 +140,29 @@ const addDays = (s, n) => {
 const isDate = s => /^\d{4}-\d{2}-\d{2}$/.test(s || '');
 
 // ---------- class schedule (sample data; replace with a real feed later) ----------
-const TYPES = ['Yoga Sculpt', 'CorePower StrengthX', 'CorePower1', 'CorePower 2'];
-const LOCS = ['Lakeview', 'Lincoln Park', 'Old Town'];
-const TIMES = ['06:00', '12:00', '18:00'];
+// Each studio has its own locations. Location names are unique across studios, so a location identifies its studio.
+const STUDIOS = {
+  corepower: { name: 'CorePower', types: ['Yoga Sculpt', 'CorePower StrengthX', 'CorePower1', 'CorePower 2'], locs: ['Lakeview', 'Lincoln Park', 'Old Town'], times: ['06:00', '12:00', '18:00'] },
+  solid: { name: 'Solid Core', types: ['Full Body 50', 'Core and Legs 50', 'Upper Body 50', 'Express 30'], locs: ['West Loop', 'Gold Coast', 'River North'], times: ['06:30', '12:15', '18:30'] },
+  barre: { name: 'Pure Barre', types: ['Barre Classic', 'Barre Sculpt', 'Barre Burn', 'Barre Stretch'], locs: ['Hyde Park', 'Bucktown', 'Andersonville'], times: ['07:00', '09:30', '17:30'] }
+};
+const STUDIO_IDS = Object.keys(STUDIOS);
+const LOCS = STUDIO_IDS.flatMap(id => STUDIOS[id].locs);
+const studioOfLocation = loc => { const l = String(loc || '').toLowerCase(); return STUDIO_IDS.find(id => STUDIOS[id].locs.some(x => l.includes(x.toLowerCase()))) || null; };
+const parseStudios = v => (v ? String(v).split(',').filter(x => STUDIO_IDS.includes(x)) : null);
 function ensureClasses() {
-  const ins = db.prepare(`INSERT INTO classes(type,location,start,capacity)
-    SELECT ?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM classes WHERE location=? AND start=? AND created_by IS NULL)`);
+  const ins = db.prepare(`INSERT INTO classes(type,location,start,capacity,studio)
+    SELECT ?,?,?,?,? WHERE NOT EXISTS (SELECT 1 FROM classes WHERE location=? AND start=? AND created_by IS NULL)`);
   const t = todayStr();
   for (let d = 0; d < 14; d++) {
     const day = addDays(t, d);
-    TIMES.forEach((tm, j) => LOCS.forEach((loc, k) => {
-      const start = `${day}T${tm}`;
-      ins.run(TYPES[(d + j + k) % 4], loc, start, 12 + ((d * 7 + j * 5 + k * 3) % 13), loc, start);
-    }));
+    for (const id of STUDIO_IDS) {
+      const st = STUDIOS[id];
+      st.times.forEach((tm, j) => st.locs.forEach((loc, k) => {
+        const start = `${day}T${tm}`;
+        ins.run(st.types[(d + j + k) % 4], loc, start, 12 + ((d * 7 + j * 5 + k * 3) % 13), id, loc, start);
+      }));
+    }
   }
 }
 ensureClasses();
@@ -201,11 +215,11 @@ const userName = id => (db.prepare('SELECT name FROM users WHERE id=?').get(id) 
 // Studio classes are visible to everyone. A class a member added by hand is visible only to them and their friends.
 const canSee = (c, uid, fids) => c.created_by == null || c.created_by === uid || (fids || friendIds(uid)).includes(c.created_by);
 
-function classesFor(uid, from, to) {
+function classesFor(uid, from, to, studio) {
   const fids = friendIds(uid);
   const cls = db.prepare(`SELECT c.*, (SELECT COUNT(*) FROM bookings WHERE class=c.id) AS booked
     FROM classes c WHERE substr(c.start,1,10) BETWEEN ? AND ? ORDER BY c.start, c.location`).all(from, to)
-    .filter(c => canSee(c, uid, fids));
+    .filter(c => canSee(c, uid, fids) && (!studio || c.studio === studio));
   const mine = new Map(db.prepare('SELECT class, private FROM bookings WHERE user=?').all(uid).map(r => [r.class, r.private]));
   const friends = [];
   for (const id of friendIds(uid)) {
@@ -222,7 +236,7 @@ function classesFor(uid, from, to) {
       else if (f.starts.has(c.start)) busy.push({ id: f.id, name: f.name });
     }
     return {
-      id: c.id, type: c.type, location: c.location, start: c.start,
+      id: c.id, type: c.type, location: c.location, start: c.start, studio: c.studio,
       spotsLeft: c.capacity - c.booked, booked: mine.has(c.id), private: mine.get(c.id) === 1, going, busy
     };
   });
@@ -268,7 +282,7 @@ const send = (res, code, obj) => {
 };
 const fail = (code, msg) => Object.assign(new Error(msg), { code });
 const { parseAny, clean } = require('./import');
-const LIKELY = /corepower|yoga|sculpt|pilates|barre|strengthx|hiit|cycle|spin|class/i;
+const LIKELY = /corepower|solid|yoga|sculpt|pilates|barre|strengthx|hiit|cycle|spin|class/i;
 const studioTime = d => d.toLocaleString('sv-SE', { timeZone: TZ }).slice(0, 16).replace(' ', 'T');
 
 // Validates one imported row; returns the cleaned row or { error }.
@@ -379,8 +393,18 @@ async function api(req, res, url) {
   const uid = au.id;
 
   if (route === 'GET /api/me') {
-    const u = db.prepare('SELECT id,name,email,hide_all,verified FROM users WHERE id=?').get(uid);
-    return send(res, 200, { user: u, today: todayStr(), requireVerify: REQUIRE_VERIFY });
+    const u = db.prepare('SELECT id,name,email,hide_all,verified,studios FROM users WHERE id=?').get(uid);
+    u.studios = parseStudios(u.studios);
+    const catalog = STUDIO_IDS.map(id => ({ id, name: STUDIOS[id].name, locations: STUDIOS[id].locs }));
+    return send(res, 200, { user: u, today: todayStr(), requireVerify: REQUIRE_VERIFY, studios: catalog });
+  }
+  if (route === 'POST /api/studios') {
+    const b = await readBody(req);
+    const list = Array.isArray(b.studios) ? [...new Set(b.studios)] : [];
+    if (!list.length || list.length > STUDIO_IDS.length || !list.every(x => STUDIO_IDS.includes(x))) throw fail(400, 'Choose at least one studio');
+    const ordered = STUDIO_IDS.filter(x => list.includes(x));
+    db.prepare('UPDATE users SET studios=? WHERE id=?').run(ordered.join(','), uid);
+    return send(res, 200, { studios: ordered });
   }
   if (route === 'POST /api/verify/resend') {
     const u = db.prepare('SELECT id,name,email,verified FROM users WHERE id=?').get(uid);
@@ -408,7 +432,9 @@ async function api(req, res, url) {
   if (route === 'GET /api/classes') {
     const day = q.get('date') || todayStr();
     if (!isDate(day)) throw fail(400, 'Invalid date');
-    return send(res, 200, { classes: classesFor(uid, day, day) });
+    const studio = q.get('studio');
+    if (studio && !STUDIO_IDS.includes(studio)) throw fail(400, 'Unknown studio');
+    return send(res, 200, { classes: classesFor(uid, day, day, studio) });
   }
   if (route === 'GET /api/bookings') {
     const t = todayStr();
@@ -446,7 +472,12 @@ async function api(req, res, url) {
       else {
         const ex = db.prepare('SELECT id FROM classes WHERE created_by=? AND location=? AND start=?').get(uid, c.location, c.start);
         if (ex) cid = ex.id;
-        else { cid = Number(db.prepare('INSERT INTO classes(type,location,start,capacity,created_by) VALUES(?,?,?,30,?)').run(c.type, c.location, c.start, uid).lastInsertRowid); created = true; }
+        else {
+          const mine = parseStudios(db.prepare('SELECT studios FROM users WHERE id=?').get(uid).studios);
+          const text = (c.type + ' ' + c.location).toLowerCase();
+          const studio = studioOfLocation(c.location) || (/solid/.test(text) ? 'solid' : /barre/.test(text) ? 'barre' : /corepower/.test(text) ? 'corepower' : (mine && mine[0]) || 'corepower');
+          cid = Number(db.prepare('INSERT INTO classes(type,location,start,capacity,created_by,studio) VALUES(?,?,?,30,?,?)').run(c.type, c.location, c.start, uid, studio).lastInsertRowid); created = true;
+        }
       }
       try { bookClass(uid, cid); booked++; }
       catch (e) {

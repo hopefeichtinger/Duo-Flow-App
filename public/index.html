@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#ffffff">
+<meta name="theme-color" content="#fff0f5">
 <title>Duo Flow</title>
 <link rel="manifest" href="/manifest.webmanifest">
 <link rel="apple-touch-icon" href="/icon.png">
@@ -12,32 +12,47 @@
 <meta name="apple-mobile-web-app-title" content="Duo Flow">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <style>
-:root{color-scheme:light;--bg:#fff;--card:#fff;--ink:#2b2745;--mute:#6f6c8c;--line:#f0eef9;--me:#7f6bff;--you:#a8ecda;--soft:#f6f4ff;--on:#fff;--bad:#c0392b}
+:root{color-scheme:light;--bg:#fff5f9;--card:#fff;--ink:#3a1f2b;--mute:#8a5b6d;--line:#fbdce8;--me:#d9457e;--me2:#f4789f;--me-t:#c2306a;--you:#fbb8cd;--soft:#fff0f5;--on:#fff;--on-you:#5a1030;--bad:#c0392b;--glow:217,69,126}
+:root[data-studio="corepower"]{--bg:#fffaf0;--me:#f47c16;--me2:#ffb347;--me-t:#b34700;--you:#ffd23f;--soft:#fff6e3;--line:#fdeccb;--ink:#2d2210;--mute:#86714f;--on:#2a1600;--on-you:#3a2a00;--glow:244,124,22}
+:root[data-studio="solid"]{--bg:#f6f8ff;--me:#2f55d4;--me2:#6f8cf0;--me-t:#2a49bd;--you:#111111;--soft:#eef2ff;--line:#e2e7f7;--ink:#0b0b0f;--mute:#5a6275;--on:#fff;--on-you:#fff;--glow:47,85,212}
+:root[data-studio="barre"]{--bg:#fff7f7;--me:#e02020;--me2:#ff6b6b;--me-t:#c81818;--you:#ffb3b3;--soft:#fff0f0;--line:#fde0e0;--ink:#2a1214;--mute:#8a5f62;--on:#fff;--on-you:#5a1010;--glow:224,32,32}
 *{box-sizing:border-box}
 body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.4 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
-.wrap{max-width:480px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px 120px}
+.wrap{position:relative;max-width:480px;margin:0 auto;padding:calc(18px + env(safe-area-inset-top,0px)) 16px 120px}
 .top{display:flex;align-items:center;gap:10px;margin-bottom:14px}
-.mark{width:38px;height:26px;position:relative;flex:none}
-.mark i{position:absolute;top:0;width:26px;height:26px;border-radius:50%;mix-blend-mode:multiply}
-.mark i:first-child{left:0;background:var(--me)}.mark i:last-child{left:12px;background:var(--you)}
+.mark{width:34px;height:34px;flex:none;display:block}
+.mark .a{fill:var(--me2)}.mark .b{fill:var(--you)}.mark .c{fill:var(--me)}
+.brand{all:unset;display:flex;align-items:center;gap:10px;cursor:default}
+.brand.pick{cursor:pointer}.brand:focus-visible{outline:3px solid var(--you);outline-offset:4px;border-radius:12px}
+.chip{display:inline-flex;align-items:center;gap:5px;background:var(--soft);color:var(--me-t);border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-size:13px;font-weight:700}
+.chip[hidden]{display:none}.chip svg{width:12px;height:12px;stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.menu{position:absolute;left:16px;top:calc(60px + env(safe-area-inset-top,0px));z-index:20;background:var(--card);border:1px solid var(--line);border-radius:18px;padding:6px;min-width:210px;box-shadow:0 14px 34px rgba(var(--glow),.22)}
+.menu[hidden]{display:none}
+.menu button{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;padding:11px 12px;border-radius:12px;cursor:pointer;font-weight:600;color:var(--ink)}
+.menu button:hover,.menu button:focus-visible{background:var(--soft)}.menu button.on{background:var(--soft);color:var(--me-t)}
+.dot{width:14px;height:14px;border-radius:50%;flex:none;border:2px solid #fff;box-shadow:0 0 0 1px var(--line)}
+.studio{display:flex;gap:12px;align-items:center;cursor:pointer;border:2px solid var(--line);border-radius:18px;padding:14px;margin-bottom:10px;background:var(--card)}
+.studio.on{border-color:var(--me);background:var(--soft)}.studio input{width:22px;height:22px;margin:0;flex:none;accent-color:var(--me)}
 h1{font-size:26px;margin:0;letter-spacing:-.3px}
 .bell{margin-left:auto;position:relative;border:0;background:var(--soft);width:42px;height:42px;border-radius:50%;color:var(--ink);cursor:pointer;display:grid;place-items:center;flex:none}
 .bell[hidden]{display:none}
 .bell svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .bell b{position:absolute;top:-3px;right:-3px;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--bad);color:#fff;font-size:11px;line-height:18px;text-align:center}
 .card.unread{border-color:var(--me)}
+.auth{background:var(--card);border:1px solid var(--line);border-radius:26px;padding:20px 18px 14px;box-shadow:0 10px 30px rgba(var(--glow),.12)}
+.auth h2{margin-top:4px}.hero{text-align:center;margin:8px 0 18px}.hero .mark{width:84px;height:84px;margin:0 auto 6px}
 h2{font-size:18px;margin:20px 0 8px;letter-spacing:-.2px}
 p{margin:4px 0}.mute{color:var(--mute);font-size:14px}.err{color:var(--bad);font-size:14px;min-height:20px}
 .grow{flex:1;min-width:0}.row{display:flex;align-items:center;gap:10px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:12px;box-shadow:0 6px 22px rgba(122,102,255,.07)}
-.cls{border-left:6px solid var(--you)}.cls b{display:block}
+.card{background:var(--card);border:1px solid var(--line);border-radius:22px;padding:16px;margin-bottom:12px;box-shadow:0 6px 22px rgba(var(--glow),.08)}
+.cls{border-left:6px solid var(--me2)}.cls b{display:block}
 .av{width:36px;height:36px;border-radius:50%;display:inline-grid;place-items:center;color:#fff;font-weight:700;flex:none;box-shadow:0 3px 8px rgba(0,0,0,.12)}
 .avs{display:flex}.avs .av{width:26px;height:26px;font-size:12px;margin-left:-6px;border:2px solid var(--card)}.avs .av:first-child{margin-left:0}
-.btn{border:0;border-radius:14px;padding:10px 16px;font:inherit;font-weight:600;background:linear-gradient(135deg,var(--me),#b5a9ff);color:var(--on);cursor:pointer;box-shadow:0 6px 14px rgba(122,102,255,.2)}
+.btn{border:0;border-radius:14px;padding:10px 16px;font:inherit;font-weight:600;background:linear-gradient(135deg,var(--me),var(--me2));color:var(--on);cursor:pointer;box-shadow:0 6px 14px rgba(var(--glow),.25)}
 .btn.alt{background:var(--soft);color:var(--ink);box-shadow:none}.btn:disabled{opacity:.55;cursor:default}
-.link{background:none;border:0;color:var(--me);font:inherit;font-size:14px;cursor:pointer;padding:4px 0}
+.link{background:none;border:0;color:var(--me-t);font:inherit;font-size:14px;cursor:pointer;padding:4px 0}
 button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid var(--you);outline-offset:2px}
-input,textarea{width:100%;border:1px solid #dcd8f0;border-radius:12px;padding:12px;font:inherit;margin:6px 0;background:#fff;color:var(--ink)}
+input,textarea{width:100%;border:1px solid var(--line);border-radius:12px;padding:12px;font:inherit;margin:6px 0;background:#fff;color:var(--ink)}
 input[type=file]{border:0;padding:8px 0}
 label{font-size:14px;color:var(--mute)}
 .days{display:flex;gap:8px;margin:6px 0 12px;overflow-x:auto;padding-bottom:4px}
@@ -45,12 +60,12 @@ label{font-size:14px;color:var(--mute)}
 .day span{display:block;font-size:12px;color:var(--mute)}.day b{font-size:18px}
 .day.on{background:var(--me);color:var(--on);border-color:var(--me)}.day.on span{color:var(--on)}
 .slot{display:flex;gap:10px}.slot .tm{width:58px;flex:none;font-size:13px;color:var(--mute);padding-top:18px}.slot .col{flex:1;min-width:0}
-.pill{background:var(--soft);color:var(--me);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;white-space:nowrap}
+.pill{background:var(--soft);color:var(--me-t);border-radius:999px;padding:5px 12px;font-size:13px;font-weight:600;white-space:nowrap}
 .line{display:flex;justify-content:space-between;gap:10px;padding:7px 0;border-top:1px solid var(--line);font-size:14px}
 .seg{display:flex;background:var(--soft);border-radius:10px;padding:3px;margin-top:10px}
 .seg button{flex:1;border:0;background:none;color:var(--ink);padding:7px 4px;border-radius:8px;font:inherit;font-size:14px;cursor:pointer}
 .seg button.on{background:var(--me);color:var(--on);font-weight:600}
-.sw{position:relative;width:48px;height:28px;border-radius:99px;border:0;background:#e2dff2;cursor:pointer;flex:none}
+.sw{position:relative;width:48px;height:28px;border-radius:99px;border:0;background:var(--line);cursor:pointer;flex:none}
 .sw::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;transition:transform .15s;box-shadow:0 1px 3px rgba(0,0,0,.2)}
 .sw.on{background:var(--me)}.sw.on::after{transform:translateX(20px)}
 .banner{background:var(--soft);border-radius:12px;padding:10px 12px;font-size:14px;margin-bottom:12px}
@@ -59,14 +74,14 @@ label{font-size:14px;color:var(--mute)}
 .tabs button{flex:1;border:0;background:none;color:var(--mute);padding:8px 4px 10px;font:inherit;font-size:12px;cursor:pointer}
 .tabs button span{display:block;height:24px;margin-bottom:2px}
 .tabs svg{width:24px;height:24px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
-.tabs button.on{color:var(--me);font-weight:700;background:var(--soft);border-radius:16px}
+.tabs button.on{color:var(--me-t);font-weight:700;background:var(--soft);border-radius:16px}
 #toast{position:fixed;left:50%;bottom:96px;transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:12px;font-size:14px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90%;text-align:center}
 #toast.show{opacity:1}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
 </head>
 <body>
-<div class="wrap"><div class="top"><div class="mark" aria-hidden="true"><i></i><i></i></div><h1>Duo Flow</h1><button class="bell" id="bell" hidden type="button"></button></div><main id="root"></main></div>
+<div class="wrap"><div class="top"><button class="brand" id="brand" type="button" aria-haspopup="menu" aria-expanded="false"><span id="markslot"></span><h1>Duo Flow</h1><span class="chip" id="chip" hidden></span></button><button class="bell" id="bell" hidden type="button"></button></div><div class="menu" id="menu" role="menu" hidden></div><main id="root"></main></div>
 <nav class="tabs" id="nav" aria-label="Main" hidden><div id="tabs"></div></nav>
 <div id="toast" role="status"></div>
 <script src="/app.js"></script>

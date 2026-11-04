@@ -4,7 +4,53 @@
   const nav = document.getElementById('nav');
   let token = '';
   try { token = localStorage.getItem('df_token') || ''; } catch (e) {}
-  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false };
+  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false, studios: [], studio: null, editStudios: false };
+  const DOTS = { corepower: '#f47c16', solid: '#2f55d4', barre: '#e02020' };
+  const studioName = id => (S.studios.find(x => x.id === id) || {}).name || id;
+
+  // The app mark: a ring of friends around one center, the same picture as the Home Screen icon.
+  function ringMark() {
+    const ns = 'http://www.w3.org/2000/svg';
+    const svg = document.createElementNS(ns, 'svg');
+    svg.setAttribute('viewBox', '0 0 200 200'); svg.setAttribute('class', 'mark'); svg.setAttribute('aria-hidden', 'true');
+    const dot = (cx, cy, r, c) => { const x = document.createElementNS(ns, 'circle'); x.setAttribute('cx', cx.toFixed(1)); x.setAttribute('cy', cy.toFixed(1)); x.setAttribute('r', r); x.setAttribute('class', c); svg.appendChild(x); };
+    for (let i = 0; i < 8; i++) { const a = (i * 45 - 90) * Math.PI / 180; dot(100 + 62 * Math.cos(a), 100 + 62 * Math.sin(a), 21, i % 2 ? 'b' : 'a'); }
+    dot(100, 100, 25, 'c');
+    return svg;
+  }
+  document.getElementById('markslot').appendChild(ringMark());
+
+  // Pink until a member has chosen studios, then the colors of the studio they are looking at.
+  function applyTheme() {
+    const id = S.user && S.user.studios && S.user.studios.length ? S.studio : '';
+    if (id) document.documentElement.dataset.studio = id; else delete document.documentElement.dataset.studio;
+    const m = document.querySelector('meta[name="theme-color"]');
+    if (m) m.setAttribute('content', ({ corepower: '#fffaf0', solid: '#f6f8ff', barre: '#fff7f7' })[id] || '#fff0f5');
+  }
+  const brand = document.getElementById('brand'), chip = document.getElementById('chip'), menu = document.getElementById('menu');
+  function closeMenu() { menu.hidden = true; brand.setAttribute('aria-expanded', 'false'); }
+  function paintBrand() {
+    const mine = S.user && S.user.studios ? S.user.studios : [];
+    const many = mine.length > 1;
+    chip.hidden = !mine.length;
+    fill(chip, mine.length ? studioName(S.studio) : null, many ? (() => { const n = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); n.setAttribute('viewBox', '0 0 24 24'); n.setAttribute('aria-hidden', 'true'); const pth = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pth.setAttribute('d', 'M6 9l6 6 6-6'); n.appendChild(pth); return n; })() : null);
+    brand.classList.toggle('pick', many);
+    if (many) brand.setAttribute('aria-label', 'Studio: ' + studioName(S.studio) + '. Switch studio'); else brand.removeAttribute('aria-label');
+    fill(menu, mine.map(id => el('button', { role: 'menuitem', class: id === S.studio ? 'on' : '', onclick: () => { closeMenu(); setStudio(id); } },
+      el('span', { class: 'dot', style: 'background:' + DOTS[id] }), studioName(id))));
+    if (!many) closeMenu();
+  }
+  function setStudio(id) {
+    S.studio = id; S.tab = 'home';
+    try { localStorage.setItem('df_studio', id); } catch (e) {}
+    render(); window.scrollTo(0, 0);
+  }
+  brand.addEventListener('click', () => {
+    if (!(S.user && S.user.studios && S.user.studios.length > 1)) return;
+    const open = menu.hidden; menu.hidden = !open; brand.setAttribute('aria-expanded', String(open));
+  });
+  document.addEventListener('click', ev => { if (!menu.hidden && !menu.contains(ev.target) && !brand.contains(ev.target)) closeMenu(); });
+  document.addEventListener('keydown', ev => { if (ev.key === 'Escape') closeMenu(); });
 
   // Safe DOM builder: text is always inserted as text, never as HTML.
   function el(tag, attrs, ...kids) {
@@ -67,7 +113,7 @@
   const TABS = [['home', 'Home'], ['friends', 'Friends'], ['me', 'Me'], ['privacy', 'Privacy']];
 
   function signOut() {
-    token = ''; S.user = null; S.notes = { items: [], unread: 0 };
+    token = ''; S.user = null; S.studio = null; S.editStudios = false; S.notes = { items: [], unread: 0 };
     try { localStorage.removeItem('df_token'); } catch (e) {}
     render();
   }
@@ -89,7 +135,8 @@
         await render();
       } catch (e) { msg.textContent = e.message; }
     });
-    return el('form', { onsubmit: submit },
+    return el('form', { class: 'auth', onsubmit: submit },
+      el('div', { class: 'hero' }, ringMark(), el('p', { class: 'mute' }, 'Take class with your friends.')),
       note ? el('div', { class: 'banner', role: 'status' }, note) : null,
       el('h2', {}, signup ? 'Create your account' : 'Sign in'),
       el('p', { class: 'mute' }, 'See which classes your friends are taking and book together.'),
@@ -103,6 +150,44 @@
       el('p', { style: 'text-align:center;margin-top:12px' },
         el('button', { class: 'link', type: 'button', onclick: () => { fill(root, authView(signup ? 'login' : 'signup')); } },
           signup ? 'Have an account? Sign in' : 'New here? Create an account')));
+  }
+
+  // Choose which studios the member belongs to (1, 2 or 3). Used at sign-up and again from the Me tab.
+  function studiosView(first) {
+    const mine = new Set((S.user.studios || []));
+    const msg = el('p', { class: 'err', role: 'alert' });
+    const btn = el('button', { class: 'btn', type: 'submit', style: 'width:100%' });
+    const boxes = new Map();
+    const upd = () => { const n = [...boxes.values()].filter(b => b.checked).length; btn.disabled = !n; btn.textContent = first ? (n ? 'Continue' : 'Choose a studio') : 'Save studios'; };
+    const rows = S.studios.map(st => {
+      const cb = el('input', { type: 'checkbox', id: 'st-' + st.id, checked: mine.has(st.id), onchange: () => { row.classList.toggle('on', cb.checked); upd(); } });
+      boxes.set(st.id, cb);
+      const row = el('label', { class: 'studio' + (mine.has(st.id) ? ' on' : ''), for: 'st-' + st.id },
+        cb, el('span', { class: 'dot', style: 'background:' + DOTS[st.id] }),
+        el('span', { class: 'grow' }, el('b', {}, st.name), el('br'), el('span', { class: 'mute' }, st.locations.join(' · '))));
+      return row;
+    });
+    const form = el('form', { class: first ? 'auth' : '', onsubmit: guard(async ev => {
+      ev.preventDefault(); msg.textContent = '';
+      try {
+        const r = await api('/studios', 'POST', { studios: S.studios.map(x => x.id).filter(id => boxes.get(id).checked) });
+        S.user.studios = r.studios; S.editStudios = false;
+        if (!S.studio || !r.studios.includes(S.studio)) S.studio = r.studios[0];
+        try { localStorage.setItem('df_studio', S.studio); } catch (e) {}
+        S.tab = first ? 'home' : 'me';
+        toast(first ? 'You’re all set' : 'Studios saved');
+        await render();
+      } catch (e) { msg.textContent = e.message; }
+    }) },
+      first ? el('div', { class: 'hero' }, ringMark()) : null,
+      el('h2', {}, first ? 'Which studios do you go to?' : 'My studios'),
+      el('p', { class: 'mute', style: 'margin-bottom:12px' }, first
+        ? 'Pick every studio you have a membership with, one, two or all three. Each one gets its own home page, and you can change this later.'
+        : 'Each studio gets its own home page. Switch between them from the top of the screen.'),
+      rows, msg, btn,
+      first ? null : el('p', { style: 'text-align:center;margin-top:8px' }, el('button', { class: 'link', type: 'button', onclick: () => { S.editStudios = false; render(); } }, 'Cancel')));
+    upd();
+    return form;
   }
 
   function forgotView() {
@@ -220,7 +305,7 @@
   async function homeView() {
     const box = el('div');
     const load = async () => {
-      const { classes } = await api('/classes?date=' + S.day);
+      const { classes } = await api('/classes?date=' + S.day + '&studio=' + S.studio);
       const groups = new Map();
       classes.forEach(c => { if (!groups.has(c.start)) groups.set(c.start, []); groups.get(c.start).push(c); });
       const list = el('div');
@@ -231,7 +316,7 @@
           Array.from({ length: 7 }, (_, i) => addDays(S.today, i)).map(d =>
             el('button', { class: 'day' + (d === S.day ? ' on' : ''), role: 'tab', 'aria-selected': String(d === S.day), onclick: guard(async () => { S.day = d; await load(); }) },
               el('span', {}, wk(d)), el('b', {}, Number(d.slice(8)))))),
-        el('p', { class: 'mute' }, wk(S.day, true) + ', ' + md(S.day) + '. Friends who share their schedule show up on each class.'),
+        el('p', { class: 'mute' }, studioName(S.studio) + ' · ' + wk(S.day, true) + ', ' + md(S.day) + '. Friends who share their schedule show up on each class.'),
         classes.length ? list : el('div', { class: 'card mute' }, 'No classes on this day.'));
     };
     await load();
@@ -287,7 +372,11 @@
   // ---------- Me ----------
   async function meView() {
     const { classes } = await api('/bookings');
+    if (S.editStudios) return studiosView(false);
     return el('div', {},
+      el('div', { class: 'card row' },
+        el('div', { class: 'grow' }, el('b', {}, 'My studios'), el('br'), el('span', { class: 'mute' }, (S.user.studios || []).map(studioName).join(' · '))),
+        el('button', { class: 'btn alt', onclick: () => { S.editStudios = true; render(); } }, 'Edit')),
       el('h2', {}, 'My schedule'),
       el('p', { class: 'mute' }, classes.length ? classes.length + (classes.length > 1 ? ' upcoming classes' : ' upcoming class') : ''),
       classes.length ? classes.map(c => el('div', { class: 'card cls' },
@@ -328,7 +417,7 @@
     }) },
       el('label', { for: 'm-date' }, 'Date'), f.date, el('label', { for: 'm-time' }, 'Time'), f.time,
       el('label', { for: 'm-type' }, 'Class'), f.type, el('label', { for: 'm-loc' }, 'Studio location'), f.loc,
-      el('datalist', { id: 'studios' }, ['Lakeview', 'Lincoln Park', 'Old Town'].map(v => el('option', { value: v }))),
+      el('datalist', { id: 'studios' }, S.studios.filter(st => (S.user.studios || []).includes(st.id)).flatMap(st => st.locations).map(v => el('option', { value: v }))),
       el('button', { class: 'btn', type: 'submit', style: 'margin-top:8px' }, 'Add class'));
 
     // File or pasted text
@@ -413,11 +502,22 @@
   async function render() {
     const note = S.linkNote; S.linkNote = null;
     bell.hidden = !token || !!S.reset;
-    if (S.reset) { nav.hidden = true; fill(root, resetView()); return; }
-    if (!token) { nav.hidden = true; fill(root, authView('login', note)); return; }
+    closeMenu();
+    if (S.reset) { nav.hidden = true; applyTheme(); paintBrand(); fill(root, resetView()); return; }
+    if (!token) { nav.hidden = true; bell.hidden = true; applyTheme(); paintBrand(); fill(root, authView('login', note)); return; }
     try {
-      if (!S.user) { const me = await api('/me'); S.user = me.user; S.today = me.today; S.requireVerify = me.requireVerify; }
+      if (!S.user) { const me = await api('/me'); S.user = me.user; S.today = me.today; S.requireVerify = me.requireVerify; S.studios = me.studios; }
       if (!S.day) S.day = S.today;
+      const mine = S.user.studios;
+      if (mine && mine.length) {
+        if (!S.studio || !mine.includes(S.studio)) { let saved = ''; try { saved = localStorage.getItem('df_studio') || ''; } catch (e) {} S.studio = mine.includes(saved) ? saved : mine[0]; }
+      }
+      applyTheme(); paintBrand();
+      if (!mine || !mine.length) {
+        nav.hidden = true; bell.hidden = true;
+        fill(root, note ? el('div', { class: 'banner', role: 'status' }, note) : null, S.requireVerify && !S.user.verified ? verifyBanner() : null, studiosView(true));
+        return;
+      }
       try { S.notes = await api('/notifications'); } catch (e) { if (!token) return; }
       const views = { home: homeView, friends: friendsView, me: meView, privacy: privacyView, alerts: async () => alertsView() };
       const body = await views[S.tab]();
