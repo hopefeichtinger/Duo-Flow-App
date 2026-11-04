@@ -4,7 +4,7 @@
   const nav = document.getElementById('nav');
   let token = '';
   try { token = localStorage.getItem('df_token') || ''; } catch (e) {}
-  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false, studios: [], studio: null, editStudios: false, loc: null, locMsg: '' };
+  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false, studios: [], studio: null, editStudios: false, loc: null, locMsg: '', locSel: null, locOpen: false };
   const DOTS = { corepower: '#f47c16', solid: '#2f55d4', barre: '#e02020' };
   const studioName = id => (S.studios.find(x => x.id === id) || {}).name || id;
 
@@ -17,6 +17,12 @@
     for (const l of st.locations) { const d = miles(S.loc, st.coords[l]); if (!best || d < best.d) best = { name: l, d }; }
     return best;
   }
+  function ranked() {
+    const st = S.studios.find(x => x.id === S.studio);
+    if (!S.loc || !st) return [];
+    return st.locations.map(l => ({ name: l, d: miles(S.loc, st.coords[l]) })).sort((a, b) => a.d - b.d);
+  }
+  const fmtMi = d => (d < 10 ? d.toFixed(1) : Math.round(d)) + ' mi';
   function shareLoc(quiet) {
     if (!navigator.geolocation) { if (!quiet) { S.locMsg = 'This browser can’t share location.'; render(); } return; }
     if (!quiet) { S.locMsg = 'Asking for your location…'; render(); }
@@ -27,8 +33,13 @@
       render();
     }, () => { S.locMsg = quiet ? '' : 'Location is off for this page. Allow it in your browser or phone settings and try again.'; if (!quiet) render(); }, { timeout: 10000, maximumAge: 600000 });
   }
-  function locOff() { S.loc = null; S.locMsg = ''; try { localStorage.removeItem('df_loc'); } catch (e) {} render(); }
+  function locOff() { S.loc = null; S.locSel = null; S.locOpen = false; S.locMsg = ''; try { localStorage.removeItem('df_loc'); } catch (e) {} render(); }
   try { if (localStorage.getItem('df_loc') === '1') shareLoc(true); } catch (e) {}
+
+  const svgIcon = (d, rot) => { const ns = 'http://www.w3.org/2000/svg', v = document.createElementNS(ns, 'svg'); v.setAttribute('viewBox', '0 0 16 16'); v.setAttribute('width', '14'); v.setAttribute('height', '14'); v.setAttribute('aria-hidden', 'true');
+    v.setAttribute('style', 'fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transform:rotate(' + (rot || 0) + 'deg)'); const q = document.createElementNS(ns, 'path'); q.setAttribute('d', d); v.appendChild(q); return v; };
+  const chevron = open => svgIcon('M3.5 6 8 10.5 12.5 6', open ? 180 : 0);
+  const check = () => svgIcon('M3 8.5 6.5 12 13 4.5');
 
   // The app mark: a ring of friends around one center, the same picture as the Home Screen icon.
   function ringMark() {
@@ -63,7 +74,7 @@
     if (!many) closeMenu();
   }
   function setStudio(id) {
-    S.studio = id; S.tab = 'home';
+    S.studio = id; S.tab = 'home'; S.locSel = null; S.locOpen = false;
     try { localStorage.setItem('df_studio', id); } catch (e) {}
     render(); window.scrollTo(0, 0);
   }
@@ -328,7 +339,8 @@
   async function homeView() {
     const box = el('div');
     const load = async () => {
-      const { classes } = await api('/classes?date=' + S.day + '&studio=' + S.studio);
+      let { classes } = await api('/classes?date=' + S.day + '&studio=' + S.studio);
+      if (S.locSel && S.loc) classes = classes.filter(c => c.location === S.locSel);
       const groups = new Map();
       classes.forEach(c => { if (!groups.has(c.start)) groups.set(c.start, []); groups.get(c.start).push(c); });
       const list = el('div');
@@ -339,8 +351,16 @@
           Array.from({ length: 7 }, (_, i) => addDays(S.today, i)).map(d =>
             el('button', { class: 'day' + (d === S.day ? ' on' : ''), role: 'tab', 'aria-selected': String(d === S.day), onclick: guard(async () => { S.day = d; await load(); }) },
               el('span', {}, wk(d)), el('b', {}, Number(d.slice(8)))))),
-        nearest() ? el('p', { class: 'mute' }, 'Nearest to you: ', el('b', {}, nearest().name), ' · ' + (nearest().d < 10 ? nearest().d.toFixed(1) : Math.round(nearest().d)) + ' mi')
+        nearest() ? el('div', { class: 'row', style: 'gap:4px' },
+            el('p', { class: 'mute' }, 'Nearest to you: ', el('b', {}, nearest().name), ' · ' + fmtMi(nearest().d)),
+            el('button', { class: 'link', type: 'button', style: 'padding:4px 8px', 'aria-label': 'Other close locations', 'aria-expanded': String(S.locOpen), 'aria-controls': 'loclist',
+              onclick: guard(async () => { S.locOpen = !S.locOpen; await load(); }) }, chevron(S.locOpen)))
           : el('p', { class: 'mute' }, el('button', { class: 'link', type: 'button', onclick: () => shareLoc(false) }, 'Show my nearest location')),
+        nearest() && S.locOpen ? el('div', { class: 'card', id: 'loclist', style: 'padding:6px' },
+          [{ name: null }].concat(ranked()).map(r => el('button', { class: 'locrow' + (S.locSel === r.name ? ' on' : ''), type: 'button',
+            onclick: guard(async () => { S.locSel = r.name; S.locOpen = false; await load(); }) },
+            el('span', { class: 'grow' }, r.name || 'All locations'), el('span', { class: 'mute' }, r.name ? fmtMi(r.d) : ''), S.locSel === r.name ? check() : null))) : null,
+        S.locSel && nearest() ? el('p', { class: 'mute' }, 'Showing classes at ' + S.locSel + ' only.') : null,
         el('p', { class: 'mute' }, studioName(S.studio) + ' · ' + wk(S.day, true) + ', ' + md(S.day) + '. Friends who share their schedule show up on each class.'),
         classes.length ? list : el('div', { class: 'card mute' }, 'No classes on this day.'));
     };
