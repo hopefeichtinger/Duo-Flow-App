@@ -1,5 +1,5 @@
 'use strict';
-// Duo Flow server: zero dependencies. Needs Node 22.13+ (built-in node:sqlite).
+// StudioSocial server: zero dependencies. Needs Node 22.13+ (built-in node:sqlite).
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
@@ -73,7 +73,7 @@ const SECRET = loadSecret();
 // With RESEND_API_KEY set, mail goes out through Resend. Without it, messages are printed in the server log
 // (and kept in `outbox` for tests) and email verification is off unless REQUIRE_VERIFY=1.
 const RESEND_KEY = process.env.RESEND_API_KEY || '';
-const MAIL_FROM = process.env.MAIL_FROM || 'Duo Flow <onboarding@resend.dev>';
+const MAIL_FROM = process.env.MAIL_FROM || 'StudioSocial <onboarding@resend.dev>';
 const REQUIRE_VERIFY = process.env.REQUIRE_VERIFY ? process.env.REQUIRE_VERIFY === '1' : !!RESEND_KEY;
 const MAIL_HOURLY_CAP = Number(process.env.MAIL_HOURLY_CAP || 60);
 const baseUrl = () => (process.env.BASE_URL || process.env.RENDER_EXTERNAL_URL || `http://localhost:${PORT}`).replace(/\/+$/, '');
@@ -120,8 +120,8 @@ function useAuthToken(raw, kind) {
 }
 function sendVerification(u) {
   const raw = newAuthToken(u.id, 'verify', 24 * 3600e3);
-  return sendMail(u.email, 'Confirm your email for Duo Flow',
-    `Hi ${u.name},\n\nConfirm your email to start adding friends on Duo Flow:\n\n${baseUrl()}/#verify=${raw}\n\nThis link works for 24 hours. If you didn't create an account, you can ignore this email.\n`);
+  return sendMail(u.email, 'Confirm your email for StudioSocial',
+    `Hi ${u.name},\n\nConfirm your email to start adding friends on StudioSocial:\n\n${baseUrl()}/#verify=${raw}\n\nThis link works for 24 hours. If you didn't create an account, you can ignore this email.\n`);
 }
 setInterval(() => {
   db.prepare('DELETE FROM auth_tokens WHERE expires<?').run(Date.now());
@@ -373,7 +373,7 @@ async function api(req, res, url) {
     // Same answer whether or not the address has an account, so this can't be used to look people up.
     if (u && mailAllowed(email)) {
       const raw = newAuthToken(u.id, 'reset', 3600e3);
-      sendMail(email, 'Reset your Duo Flow password',
+      sendMail(email, 'Reset your StudioSocial password',
         `Hi ${u.name},\n\nChoose a new password:\n\n${baseUrl()}/#reset=${raw}\n\nThis link works for 1 hour and only once. If you didn't ask for this, ignore this email. Your password stays the same.\n`);
     }
     return send(res, 200, { ok: true });
@@ -593,7 +593,7 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname === '/icon.png') { res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }); return res.end(ICON); }
     if (url.pathname === '/manifest.webmanifest') {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' });
-      return res.end(JSON.stringify({ name: 'Duo Flow', short_name: 'Duo Flow', start_url: '/', display: 'standalone', background_color: '#ffffff', theme_color: '#ffffff', icons: [{ src: '/icon.png', sizes: '180x180', type: 'image/png' }] }));
+      return res.end(JSON.stringify({ name: 'StudioSocial', short_name: 'StudioSocial', start_url: '/', display: 'standalone', background_color: '#ffffff', theme_color: '#ffffff', icons: [{ src: '/icon.png', sizes: '180x180', type: 'image/png' }] }));
     }
     const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
     const file = path.normalize(path.join(PUBLIC, rel));
@@ -608,5 +608,5 @@ const server = http.createServer(async (req, res) => {
     send(res, 500, { error: 'Something went wrong. Try again.' });
   }
 });
-server.listen(PORT, () => console.log(`Duo Flow running at http://localhost:${server.address().port}`));
+server.listen(PORT, () => console.log(`StudioSocial running at http://localhost:${server.address().port}`));
 module.exports = { server, db, hashPw, addDays, todayStr, outbox };

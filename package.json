@@ -1,8 +1,8 @@
 {
-  "name": "duo-flow",
+  "name": "studiosocial",
   "version": "0.1.0",
   "private": true,
-  "description": "Duo Flow: see friends' studio classes and book together, with privacy controls.",
+  "description": "StudioSocial: see friends' studio classes and book together, with privacy controls.",
   "main": "server.js",
   "engines": { "node": ">=22.13" },
   "scripts": {

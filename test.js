@@ -33,7 +33,7 @@ const signup = async (name, email) => {
 (async () => {
   await new Promise(r => server.listening ? r() : server.once('listening', r));
   base = 'http://127.0.0.1:' + server.address().port;
-  console.log('Duo Flow tests');
+  console.log('StudioSocial tests');
 
   const me = await call('GET', '/api/me', null, null);
   assert.equal(me.status, 401);

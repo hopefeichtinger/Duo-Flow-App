@@ -1,4 +1,4 @@
-# Duo Flow
+# StudioSocial
 
 See which studio classes your friends are taking and book the same one. Members approve who can see their schedule, and can hide it at any time.
 
@@ -61,7 +61,7 @@ Host it somewhere that gives you a persistent disk and HTTPS (for example Fly.io
 Email goes out through [Resend](https://resend.com) (no extra packages). Set:
 
 - `RESEND_API_KEY`: your API key. Setting it turns email verification on.
-- `MAIL_FROM`: for example `Duo Flow <hello@yourdomain.com>`. **The address must be on a domain you have verified in Resend.** Resend's `onboarding@resend.dev` test sender only delivers to the email on your own Resend account, so friends won't receive anything from it.
+- `MAIL_FROM`: for example `StudioSocial <hello@yourdomain.com>`. **The address must be on a domain you have verified in Resend.** Resend's `onboarding@resend.dev` test sender only delivers to the email on your own Resend account, so friends won't receive anything from it.
 - `BASE_URL`: the public address, such as `https://duo-flow.onrender.com`. Render sets `RENDER_EXTERNAL_URL` automatically, which is used if `BASE_URL` is not set.
 - `REQUIRE_VERIFY`: `1` or `0` to override. The default is on when `RESEND_API_KEY` is set and off otherwise.
 
@@ -83,7 +83,7 @@ Notifications respect privacy every time the list loads, not just when the event
 - **Duplicate member classes.** Two friends who each add the same real class will have two separate copies (matched only when it fits the sample schedule). They still see each other as busy at that time.
 - **Push notifications and notification emails** are not built. Alerts appear in the app when it is opened or refreshed (the bell checks every minute while the app is open).
 - **Changing your password while signed in**, and **deleting an account**, are not built. Forgot password works as a way to change it.
-- **Booking** here reserves a spot inside Duo Flow only. It does not book in the CorePower app.
+- **Booking** here reserves a spot inside StudioSocial only. It does not book in the CorePower app.
 - Login and email limits are in memory and reset on restart. Add a proper rate limiter behind a proxy when public. Behind a proxy all visitors share one address, so limits are keyed by email address, not by IP.
 - Adding a friend by email tells the sender whether that email has an account. Fine for a small pilot; change it before wide launch.
 - `node:sqlite` is marked experimental in Node 22. It works, but pin your Node version in production.
