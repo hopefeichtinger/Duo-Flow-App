@@ -4,7 +4,7 @@
   const nav = document.getElementById('nav');
   let token = '';
   try { token = localStorage.getItem('df_token') || ''; } catch (e) {}
-  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false, studios: [], studio: null, editStudios: false, loc: null, locMsg: '', locSel: null, locOpen: false };
+  const S = { tab: 'home', day: null, today: null, user: null, notes: { items: [], unread: 0 }, reset: null, linkNote: null, requireVerify: false, studios: [], studio: null, editStudios: false, loc: null, locMsg: '', locSel: null, locOpen: false, onbLoc: false };
   const DOTS = { corepower: '#f47c16', solid: '#2f55d4', barre: '#e02020' };
   const studioName = id => (S.studios.find(x => x.id === id) || {}).name || id;
 
@@ -55,7 +55,7 @@
 
   // Pink until a member has chosen studios, then the colors of the studio they are looking at.
   function applyTheme() {
-    const id = S.user && S.user.studios && S.user.studios.length ? S.studio : '';
+    const id = S.user && S.user.studios && S.user.studios.length && !S.onbLoc ? S.studio : '';
     if (id) document.documentElement.dataset.studio = id; else delete document.documentElement.dataset.studio;
     const m = document.querySelector('meta[name="theme-color"]');
     if (m) m.setAttribute('content', ({ corepower: '#fffaf0', solid: '#f6f8ff', barre: '#fff7f7' })[id] || '#fff0f5');
@@ -65,7 +65,7 @@
   function paintBrand() {
     const mine = S.user && S.user.studios ? S.user.studios : [];
     const many = mine.length > 1;
-    chip.hidden = !mine.length;
+    chip.hidden = !mine.length || S.onbLoc;
     fill(chip, mine.length ? studioName(S.studio) : null, many ? (() => { const n = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); n.setAttribute('viewBox', '0 0 24 24'); n.setAttribute('aria-hidden', 'true'); const pth = document.createElementNS('http://www.w3.org/2000/svg', 'path'); pth.setAttribute('d', 'M6 9l6 6 6-6'); n.appendChild(pth); return n; })() : null);
     brand.classList.toggle('pick', many);
     if (many) brand.setAttribute('aria-label', 'Studio: ' + studioName(S.studio) + '. Switch studio'); else brand.removeAttribute('aria-label');
@@ -146,7 +146,7 @@
   const TABS = [['home', 'Home'], ['friends', 'Friends'], ['me', 'Me'], ['privacy', 'Privacy']];
 
   function signOut() {
-    token = ''; S.user = null; S.studio = null; S.editStudios = false; S.loc = null; S.locMsg = ''; S.notes = { items: [], unread: 0 };
+    token = ''; S.user = null; S.studio = null; S.editStudios = false; S.onbLoc = false; S.loc = null; S.locMsg = ''; S.notes = { items: [], unread: 0 };
     try { localStorage.removeItem('df_token'); } catch (e) {}
     render();
   }
@@ -207,8 +207,8 @@
         S.user.studios = r.studios; S.editStudios = false;
         if (!S.studio || !r.studios.includes(S.studio)) S.studio = r.studios[0];
         try { localStorage.setItem('df_studio', S.studio); } catch (e) {}
-        S.tab = first ? 'home' : 'me';
-        toast(first ? 'You’re all set' : 'Studios saved');
+        S.tab = first ? 'home' : 'me'; S.onbLoc = first;
+        toast(first ? 'Studios saved' : 'Studios saved');
         await render();
       } catch (e) { msg.textContent = e.message; }
     }) },
@@ -221,6 +221,18 @@
       first ? null : el('p', { style: 'text-align:center;margin-top:8px' }, el('button', { class: 'link', type: 'button', onclick: () => { S.editStudios = false; render(); } }, 'Cancel')));
     upd();
     return form;
+  }
+
+  // Second sign-up step: optional location, so the app can show the nearest studio location first.
+  function locStepView() {
+    const done = () => { S.onbLoc = false; S.tab = 'home'; toast('You’re all set'); render(); window.scrollTo(0, 0); };
+    return el('div', { class: 'auth' },
+      el('div', { class: 'hero' }, ringMark()),
+      el('h2', {}, 'Find studios near you'),
+      el('p', { class: 'mute', style: 'margin-bottom:12px' }, 'Share your location to see your nearest studio location first. Your location stays on this phone and is never shared with friends. You can turn it off any time in Me.'),
+      S.loc ? el('p', { class: 'mute' }, el('b', {}, 'Location on ✓')) : el('button', { class: 'btn alt', type: 'button', style: 'width:100%', onclick: () => shareLoc(false) }, 'Use my location'),
+      S.locMsg ? el('p', { class: 'mute', role: 'status', style: 'margin-top:8px' }, S.locMsg) : null,
+      el('button', { class: 'btn', type: 'button', style: 'width:100%;margin-top:12px', onclick: done }, S.loc ? 'Continue' : 'Skip for now'));
   }
 
   function forgotView() {
@@ -561,6 +573,11 @@
         if (!S.studio || !mine.includes(S.studio)) { let saved = ''; try { saved = localStorage.getItem('df_studio') || ''; } catch (e) {} S.studio = mine.includes(saved) ? saved : mine[0]; }
       }
       applyTheme(); paintBrand();
+      if (mine && mine.length && S.onbLoc) {
+        nav.hidden = true; bell.hidden = true;
+        fill(root, locStepView());
+        return;
+      }
       if (!mine || !mine.length) {
         nav.hidden = true; bell.hidden = true;
         fill(root, note ? el('div', { class: 'banner', role: 'status' }, note) : null, S.requireVerify && !S.user.verified ? verifyBanner() : null, studiosView(true));
