@@ -197,7 +197,7 @@
       boxes.set(st.id, cb);
       const row = el('label', { class: 'studio' + (mine.has(st.id) ? ' on' : ''), for: 'st-' + st.id },
         cb, el('span', { class: 'dot', style: 'background:' + DOTS[st.id] }),
-        el('span', { class: 'grow' }, el('b', {}, st.name), el('br'), el('span', { class: 'mute' }, st.locations.join(' · '))));
+        el('span', { class: 'grow' }, el('b', {}, st.name)));
       return row;
     });
     const form = el('form', { class: first ? 'auth' : '', onsubmit: guard(async ev => {
