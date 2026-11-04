@@ -590,10 +590,10 @@ const server = http.createServer(async (req, res) => {
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (req.method !== 'GET') throw fail(405, 'Method not allowed');
     // The Home Screen icon and install manifest live in the code, so the app is just a handful of files.
-    if (url.pathname === '/icon.png') { res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=86400' }); return res.end(ICON); }
+    if (url.pathname === '/icon.png') { res.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'public, max-age=3600' }); return res.end(ICON); }
     if (url.pathname === '/manifest.webmanifest') {
       res.writeHead(200, { 'Content-Type': 'application/manifest+json', 'Cache-Control': 'no-cache' });
-      return res.end(JSON.stringify({ name: 'StudioSocial', short_name: 'StudioSocial', start_url: '/', display: 'standalone', background_color: '#ffffff', theme_color: '#ffffff', icons: [{ src: '/icon.png', sizes: '180x180', type: 'image/png' }] }));
+      return res.end(JSON.stringify({ name: 'StudioSocial', short_name: 'StudioSocial', start_url: '/', display: 'standalone', background_color: '#ffffff', theme_color: '#ffffff', icons: [{ src: '/icon.png?v=2', sizes: '180x180', type: 'image/png' }] }));
     }
     const rel = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
     const file = path.normalize(path.join(PUBLIC, rel));
